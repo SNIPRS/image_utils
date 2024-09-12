@@ -2,6 +2,8 @@ import numpy as np
 from scipy.ndimage import distance_transform_edt, distance_transform_cdt, distance_transform_bf
 import PIL.Image as Image
 from PIL import ImageFilter
+from typing import Tuple
+import cv2 as cv
 
 MAGIC = 255
 
@@ -45,6 +47,31 @@ def outline_simplify(img: Image) -> Image:
                 MAGIC*pixels[i,j][3])
             pixelsf[i,j] = tup
     return imgf
+
+
+def get_derivatives(img: Image, ksize=9) -> Tuple[Image, Image]:
+    if img.mode != 'RGBA':
+        img = img.convert('RGBA')
+    cvimg = cv.cvtColor(np.array(img), cv.COLOR_RGB2BGR)
+    sobelx = cv.Sobel(cvimg,cv.CV_64F,1,0,ksize=ksize)
+    sobely = cv.Sobel(cvimg,cv.CV_64F,0,1,ksize=ksize)
+
+    sobelx = (sobelx/np.max(sobelx)).mean(axis=-1)
+    sobely = (sobely/np.max(sobely)).mean(axis=-1)
+    outx = Image.new('RGBA', sobelx.shape)
+    outy = Image.new('RGBA', sobely.shape)
+    pixelsx = outx.load()
+    pixelsy = outy.load()
+    pixels = img.load()
+    print(sobelx.shape, img.size, outx.size)
+    for i in range(sobelx.shape[0]):
+        for j in range(sobelx.shape[1]):
+            dx = int(sobelx[i,j]*MAGIC - MAGIC/2)
+            dy = int(sobely[i,j]*MAGIC - MAGIC/2)
+            pixelsx[i,j] = (dx, dx, dx, pixels[j,i][3])
+            pixelsy[i,j] = (dy, dy, dy, pixels[j,i][3])
+
+    return outx, outy
 
 
 def displacement_map(img: Image, map: Image, xdis: int = 10, ydis: int = 10):
